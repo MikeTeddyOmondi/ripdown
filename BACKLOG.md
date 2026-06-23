@@ -6,6 +6,8 @@ Items here are not yet implemented; they graduate to the changelog when shipped.
 ## [Unreleased / Planned]
 
 ### Added
+- YouTube cookie support (`YTDLP_COOKIES` / cookie file passed to yt-dlp) to get
+  past datacenter-IP bot checks when running from cloud hosts (Render, etc.).
 - Live download progress from yt-dlp hooks (real `progress`/`speed`/`eta` in the
   queue instead of the current coarse phases).
 - Persistent queue + download history (serde_json store) surfaced in the TUI and
@@ -17,6 +19,9 @@ Items here are not yet implemented; they graduate to the changelog when shipped.
 - Health/readiness split and Prometheus-style metrics endpoint.
 
 ### Changed
+- Build the `linux/arm64` Docker images on a native `ubuntu-24.04-arm` runner
+  (per-arch build + manifest merge) instead of slow QEMU emulation, which is the
+  layer that intermittently times out (HTTP 503) during release.
 - Stream large file downloads from local storage instead of buffering them fully
   in memory in `GET /api/files/{key}`.
 - Make storage backend swappable at runtime via a richer config object (beyond

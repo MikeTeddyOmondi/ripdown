@@ -346,7 +346,7 @@ fn draw_header(f: &mut Frame, area: ratatui::layout::Rect, _app: &App) {
     let version = Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            "v0.1.0  |  [A] add  [Q] quit",
+            "v0.3.0  |  [A] add  [Q] quit",
             Style::default().fg(MUTED),
         )),
     ])
