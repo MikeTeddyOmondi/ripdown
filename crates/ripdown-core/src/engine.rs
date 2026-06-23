@@ -201,7 +201,10 @@ mod tests {
     #[test]
     fn detect_platform_recognises_youtube() {
         assert_eq!(detect_platform("https://youtu.be/abc"), "YouTube");
-        assert_eq!(detect_platform("https://www.youtube.com/watch?v=x"), "YouTube");
+        assert_eq!(
+            detect_platform("https://www.youtube.com/watch?v=x"),
+            "YouTube"
+        );
         assert_eq!(detect_platform("https://example.com/x"), "…");
     }
 }

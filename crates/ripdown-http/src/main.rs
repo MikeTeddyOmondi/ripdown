@@ -86,9 +86,8 @@ async fn main() -> Result<()> {
     // Resolve the output dir: flag/env → ~/Downloads/ripdown for local runs.
     let output_dir = ripdown_core::config::resolve_output_dir(cli.output_dir.clone());
 
-    std::fs::create_dir_all(&output_dir).with_context(|| {
-        format!("failed to create output dir {}", output_dir.display())
-    })?;
+    std::fs::create_dir_all(&output_dir)
+        .with_context(|| format!("failed to create output dir {}", output_dir.display()))?;
     let storage = storage::from_config(cli.storage_config(&output_dir)?)?;
     tracing::info!("storage backend: {}", storage.name());
     tracing::info!("output dir: {}", output_dir.display());
