@@ -1,0 +1,29 @@
+### Health check
+curl http://localhost:8080/health
+
+### Web UI (bundled SPA)
+curl http://localhost:8080/
+
+### Queue a download (best quality)
+curl -X POST http://localhost:8080/api/download \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "format": "best", "audio_only": false}'
+
+### Queue a 1080p download
+curl -X POST http://localhost:8080/api/download \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "format": "1080p", "audio_only": false}'
+
+### Queue an audio-only download (mp3)
+curl -X POST http://localhost:8080/api/download \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "format": "audio", "audio_only": true}'
+
+### Queue snapshot (polled by the web UI)
+curl http://localhost:8080/api/queue
+
+### List stored files
+curl http://localhost:8080/api/files
+
+### Download a stored file (local stream or S3 redirect)
+curl -L http://localhost:8080/api/files/example.mp4 -o example.mp4
