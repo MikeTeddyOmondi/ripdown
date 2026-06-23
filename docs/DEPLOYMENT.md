@@ -42,8 +42,27 @@ gpg --armor --export <KEY_ID> > ripdown-public.asc
 ```
 
 Add `RELEASE_GPG_KEY` (the armored private key) and `RELEASE_GPG_PASSPHRASE` to
-the repo's **Settings → Secrets and variables → Actions**. Publish the public key
-(`ripdown-public.asc`) so users can `gpg --verify` release binaries.
+the repo's **Settings → Secrets and variables → Actions**.
+
+The matching **public** key is committed to the repo as
+[`ripdown-public.asc`](../ripdown-public.asc) (fingerprint
+`FAC9A6D3 1A96C8ED 160EE72B A0C7B97B 7D1110F2`) so anyone can verify downloads.
+
+### Verifying a release
+
+Each release ships a per-binary detached signature (`<binary>.asc`) and a
+`checksums.sha256`. To verify:
+
+```bash
+# 1. Import the public key (once)
+gpg --import ripdown-public.asc
+
+# 2. Verify the checksum
+sha256sum -c checksums.sha256
+
+# 3. Verify the signature for a binary
+gpg --verify ripdown-linux-x64.asc ripdown-linux-x64
+```
 
 ---
 
