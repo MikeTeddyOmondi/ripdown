@@ -1,7 +1,9 @@
+//! In-memory, shared download queue used by both the TUI and the HTTP service.
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::types::{DownloadItem, DownloadStatus};
+use crate::models::{DownloadItem, DownloadStatus};
 
 pub type SharedQueue = Arc<RwLock<Queue>>;
 

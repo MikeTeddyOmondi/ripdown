@@ -1,28 +1,42 @@
-[package]
-name = "ripdown"
+[workspace]
+members = ["crates/ripdown-core", "crates/ripdown-cli", "crates/ripdown-http"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-description = "A blazing-fast terminal video downloader for YouTube, X, Instagram, and 1800+ sites"
 authors = ["Rancko"]
+license = "MIT"
+description = "A blazing-fast video downloader for YouTube"
+repository = "https://github.com/locci/ripdown"
 
-[[bin]]
-name = "ripdown"
-path = "src/main.rs"
-
-[dependencies]
-clap = { version = "4", features = ["derive", "color", "env"] }
+[workspace.dependencies]
+# Async
 tokio = { version = "1", features = ["full"] }
-ratatui = "0.30.0"
-crossterm = "0.29"
-yt-dlp = { version = "2.7.1", features = ["hooks"] }
-indicatif = { version = "0.18.4", features = ["tokio"] }
-dirs = "6.0.0"
+tokio-stream = "0.1"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-anyhow = "1"
+
+# Domain helpers
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
-tokio-stream = "0.1"
+dirs = "6.0.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Download engine
+yt-dlp = { version = "2.7.1", features = ["hooks"] }
+
+# Internal
+ripdown-core = { path = "crates/ripdown-core" }
 
 [profile.release]
 opt-level = 3

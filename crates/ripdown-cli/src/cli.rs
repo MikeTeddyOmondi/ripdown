@@ -1,10 +1,14 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
+
+// `FormatChoice` is domain logic and lives in core; re-export it so the rest of
+// the CLI keeps a single import path.
+pub use ripdown_core::FormatChoice;
 
 #[derive(Parser)]
 #[command(
     name = "ripdown",
-    about = "⚡ ripdown — blazing-fast video downloader for YouTube, X, Instagram & 1800+ sites",
+    about = "⚡ ripdown — a blazing-fast video downloader for YouTube",
     long_about = r#"
   ██████╗ ██╗██████╗ ██████╗  ██████╗ ██╗    ██╗███╗   ██╗
   ██╔══██╗██║██╔══██╗██╔══██╗██╔═══██╗██║    ██║████╗  ██║
@@ -13,7 +17,7 @@ use std::path::PathBuf;
   ██║  ██║██║██║     ██████╔╝╚██████╔╝╚███╔███╔╝██║ ╚████║
   ╚═╝  ╚═╝╚═╝╚═╝     ╚═════╝  ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═══╝
 
-  Download videos from YouTube, X/Twitter, Instagram, and 1800+ platforms.
+  Download videos from YouTube — fast.
   Powered by yt-dlp under the hood. Ships its own yt-dlp + ffmpeg binaries.
 "#,
     version,
@@ -43,7 +47,7 @@ pub enum Commands {
 
 #[derive(Args, Debug, Clone)]
 pub struct DownloadArgs {
-    /// URL(s) to download — YouTube, X, Instagram, TikTok, Vimeo, etc.
+    /// URL(s) to download from YouTube
     #[arg(required = true, value_name = "URL")]
     pub urls: Vec<String>,
 
@@ -74,38 +78,4 @@ pub struct DownloadArgs {
     /// Print verbose yt-dlp output
     #[arg(short, long)]
     pub verbose: bool,
-}
-
-#[derive(ValueEnum, Clone, Debug)]
-pub enum FormatChoice {
-    /// Best available quality (default)
-    Best,
-    /// 4K / 2160p
-    #[value(name = "4k")]
-    FourK,
-    /// 1080p Full HD
-    #[value(name = "1080p")]
-    Fhd,
-    /// 720p HD
-    #[value(name = "720p")]
-    Hd,
-    /// 480p SD
-    #[value(name = "480p")]
-    Sd,
-    /// Audio only (mp3)
-    Audio,
-}
-
-impl FormatChoice {
-    /// Convert to a yt-dlp format string
-    pub fn to_ytdlp_format(&self) -> &'static str {
-        match self {
-            FormatChoice::Best => "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-            FormatChoice::FourK => "bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/best[height<=2160]",
-            FormatChoice::Fhd => "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080]",
-            FormatChoice::Hd => "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]",
-            FormatChoice::Sd => "bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]",
-            FormatChoice::Audio => "bestaudio[ext=m4a]/bestaudio",
-        }
-    }
 }

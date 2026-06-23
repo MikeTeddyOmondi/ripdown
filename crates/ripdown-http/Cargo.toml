@@ -1,0 +1,26 @@
+[package]
+name = "ripdown-http"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "HTTP service + bundled web UI for ripdown (YouTube downloader)"
+
+[[bin]]
+name = "ripdown-http"
+path = "src/main.rs"
+
+[dependencies]
+ripdown-core = { workspace = true, features = ["s3"] }
+tokio.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+clap = { version = "4", features = ["derive", "env"] }
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+rust-embed = { version = "8", features = ["mime-guess"] }
+mime_guess = "2"

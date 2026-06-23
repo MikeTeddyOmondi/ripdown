@@ -1,0 +1,50 @@
+# ripdown HTTP service backed by rustfs (S3-compatible) storage.
+#
+#   docker compose up --build
+#   open http://localhost:8080
+
+services:
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: ripdown-rustfs
+    ports:
+      - "9000:9000"
+    environment:
+      RUSTFS_ACCESS_KEY: ripdown
+      RUSTFS_SECRET_KEY: ripdown-secret
+      RUSTFS_VOLUMES: /data
+    volumes:
+      - rustfs-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ripdown-http:
+    build:
+      context: .
+      dockerfile: docker/http.Dockerfile
+    image: locci/ripdown-http:latest
+    container_name: ripdown-http
+    depends_on:
+      - rustfs
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      RIPDOWN_OUTPUT_DIR: /data/downloads
+      # Switch to S3/rustfs storage. Use `local` to keep files on the volume.
+      RIPDOWN_STORAGE: s3
+      S3_ENDPOINT: http://rustfs:9000
+      S3_REGION: us-east-1
+      S3_BUCKET: ripdown
+      S3_ACCESS_KEY: ripdown
+      S3_SECRET_KEY: ripdown-secret
+      S3_PATH_STYLE: "true"
+    volumes:
+      - ripdown-data:/data
+
+volumes:
+  rustfs-data:
+  ripdown-data:

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>⚡ ripdown</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <span class="bolt">⚡</span><span class="rip">rip</span><span class="down">down</span>
+          <span class="tagline">— blazing-fast YouTube downloader</span>
+        </div>
+        <div class="version">v0.1.0</div>
+      </header>
+
+      <section class="panel add-panel">
+        <form id="add-form" class="add-form" autocomplete="off">
+          <span class="prompt">▶</span>
+          <input
+            id="url"
+            type="url"
+            placeholder="Paste a YouTube video or playlist URL…"
+            required
+          />
+          <select id="format">
+            <option value="best">best</option>
+            <option value="4k">4k</option>
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+            <option value="audio">audio</option>
+          </select>
+          <label class="audio-toggle">
+            <input id="audio" type="checkbox" /> audio-only
+          </label>
+          <button type="submit">rip it</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Download Queue</div>
+        <table class="queue">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Platform</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Progress</th>
+            </tr>
+          </thead>
+          <tbody id="queue-body">
+            <tr class="empty"><td colspan="5">No downloads yet. Paste a URL above.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="stats" id="stats">
+        <span><b>QUEUED</b> <span id="s-queued">0</span></span>
+        <span><b>ACTIVE</b> <span id="s-active" class="cyan">0</span></span>
+        <span><b>DONE</b> <span id="s-done" class="accent">0</span></span>
+        <span><b>FAILED</b> <span id="s-failed" class="red">0</span></span>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">Files</div>
+        <ul class="files" id="files"></ul>
+      </section>
+    </div>
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

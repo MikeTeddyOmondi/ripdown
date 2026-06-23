@@ -1,0 +1,218 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── Build signed binaries for every platform ────────────────────────────────
+  build:
+    name: build ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            os: linux
+            arch: x64
+            ext: ""
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            os: linux
+            arch: arm64
+            ext: ""
+          - runner: macos-latest
+            target: aarch64-apple-darwin
+            os: macos
+            arch: arm64
+            ext: ""
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            os: macos
+            arch: x64
+            ext: ""
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            os: windows
+            arch: x64
+            ext: ".exe"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # aws-lc-rs (pulled in by rustls) needs NASM to build on Windows.
+      - name: Install NASM (Windows)
+        if: matrix.os == 'windows'
+        uses: ilammy/setup-nasm@v1
+
+      - name: Build release binaries
+        run: cargo build --release --target ${{ matrix.target }} -p ripdown-cli -p ripdown-http
+
+      - name: Stage binaries
+        shell: bash
+        run: |
+          mkdir -p dist
+          BIN=target/${{ matrix.target }}/release
+          cp "$BIN/ripdown${{ matrix.ext }}"      "dist/ripdown-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
+          cp "$BIN/ripdown-http${{ matrix.ext }}" "dist/ripdown-http-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}"
+
+      # Ad-hoc codesign so macOS Gatekeeper doesn't kill the unsigned binary.
+      - name: Sign macOS binaries (ad-hoc)
+        if: matrix.os == 'macos'
+        run: |
+          codesign --force --sign - "dist/ripdown-${{ matrix.os }}-${{ matrix.arch }}"
+          codesign --force --sign - "dist/ripdown-http-${{ matrix.os }}-${{ matrix.arch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ripdown-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/*
+
+  # ── Build & push Docker images to Docker Hub ────────────────────────────────
+  docker:
+    name: docker ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: locci/ripdown-cli
+            dockerfile: docker/cli.Dockerfile
+          - image: locci/ripdown-http
+            dockerfile: docker/http.Dockerfile
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Checksum, GPG-sign, and publish the GitHub Release ──────────────────────
+  release:
+    name: publish release
+    needs: [build, docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: ripdown-*
+          merge-multiple: true
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd dist
+          sha256sum ripdown-* > checksums.sha256
+          echo "--- checksums ---"
+          cat checksums.sha256
+
+      - name: Import GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.RELEASE_GPG_KEY }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
+
+      - name: Sign all binaries with GPG
+        env:
+          GPG_PASSPHRASE: ${{ secrets.RELEASE_GPG_PASSPHRASE }}
+        run: |
+          cd dist
+          for f in ripdown-*; do
+            echo "$GPG_PASSPHRASE" | gpg --batch --yes \
+              --passphrase-fd 0 \
+              --pinentry-mode loopback \
+              --detach-sign --armor "$f"
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/ripdown-*
+            dist/checksums.sha256
+          body: |
+            ## ripdown ${{ github.ref_name }}
+
+            A blazing-fast video downloader for YouTube — CLI, TUI, and HTTP service.
+
+            ### Docker
+
+            ```bash
+            docker pull locci/ripdown-http:${{ github.ref_name }}
+            docker pull locci/ripdown-cli:${{ github.ref_name }}
+            ```
+
+            ### Binaries
+
+            | Component | Platform | Arch | File |
+            |---|---|---|---|
+            | CLI  | Linux   | x64   | `ripdown-linux-x64` |
+            | CLI  | Linux   | arm64 | `ripdown-linux-arm64` |
+            | CLI  | macOS   | arm64 | `ripdown-macos-arm64` |
+            | CLI  | macOS   | x64   | `ripdown-macos-x64` |
+            | CLI  | Windows | x64   | `ripdown-windows-x64.exe` |
+            | HTTP | Linux   | x64   | `ripdown-http-linux-x64` |
+            | HTTP | Linux   | arm64 | `ripdown-http-linux-arm64` |
+            | HTTP | macOS   | arm64 | `ripdown-http-macos-arm64` |
+            | HTTP | macOS   | x64   | `ripdown-http-macos-x64` |
+            | HTTP | Windows | x64   | `ripdown-http-windows-x64.exe` |
+
+            ### Verify integrity
+
+            Each binary ships a SHA256 checksum and a GPG detached signature (`.asc`).
+
+            ```bash
+            # Checksums
+            sha256sum -c checksums.sha256
+
+            # GPG signature (import the public key first)
+            gpg --verify ripdown-linux-x64.asc ripdown-linux-x64
+            ```
