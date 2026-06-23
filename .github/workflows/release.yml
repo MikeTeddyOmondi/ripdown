@@ -32,11 +32,6 @@ jobs:
             os: macos
             arch: arm64
             ext: ""
-          - runner: macos-13
-            target: x86_64-apple-darwin
-            os: macos
-            arch: x64
-            ext: ""
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
             os: windows
@@ -197,12 +192,10 @@ jobs:
             | CLI  | Linux   | x64   | `ripdown-linux-x64` |
             | CLI  | Linux   | arm64 | `ripdown-linux-arm64` |
             | CLI  | macOS   | arm64 | `ripdown-macos-arm64` |
-            | CLI  | macOS   | x64   | `ripdown-macos-x64` |
             | CLI  | Windows | x64   | `ripdown-windows-x64.exe` |
             | HTTP | Linux   | x64   | `ripdown-http-linux-x64` |
             | HTTP | Linux   | arm64 | `ripdown-http-linux-arm64` |
             | HTTP | macOS   | arm64 | `ripdown-http-macos-arm64` |
-            | HTTP | macOS   | x64   | `ripdown-http-macos-x64` |
             | HTTP | Windows | x64   | `ripdown-http-windows-x64.exe` |
 
             ### Verify integrity
