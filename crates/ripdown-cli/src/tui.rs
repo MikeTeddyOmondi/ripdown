@@ -22,9 +22,9 @@ use ratatui::{
     Frame, Terminal,
 };
 
-use crate::downloader::{download_url_for_tui, fetch_title_for_tui, resolve_output_dir};
-use crate::queue::{Queue, SharedQueue};
-use crate::types::{DownloadItem, DownloadStatus};
+use ripdown_core::engine::{detect_platform, download_url, fetch_title, resolve_output_dir};
+use ripdown_core::models::{DownloadItem, DownloadStatus};
+use ripdown_core::queue::{Queue, SharedQueue};
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 const CYAN: Color = Color::Rgb(0, 220, 220);
@@ -86,7 +86,12 @@ pub async fn run() -> Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = std::io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture, EnableBracketedPaste)?;
+    execute!(
+        stdout,
+        EnterAlternateScreen,
+        EnableMouseCapture,
+        EnableBracketedPaste
+    )?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -134,72 +139,69 @@ where
                         app.url_input.push_str(text.trim());
                     }
                 }
-                Event::Key(key) => {
-                    match app.input_mode {
-                        InputMode::Normal => match (key.code, key.modifiers) {
-                            (KeyCode::Char('q'), _)
-                            | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                                break;
+                Event::Key(key) => match app.input_mode {
+                    InputMode::Normal => match (key.code, key.modifiers) {
+                        (KeyCode::Char('q'), _) | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                            break;
+                        }
+                        (KeyCode::Char('a'), _) | (KeyCode::Char('n'), _) => {
+                            app.input_mode = InputMode::AddingUrl;
+                            app.url_input.clear();
+                        }
+                        (KeyCode::Char('t'), _) => {
+                            app.audio_only = !app.audio_only;
+                        }
+                        (KeyCode::Down, _) | (KeyCode::Char('j'), _) => {
+                            let q = app.queue.read().await;
+                            let len = q.items.len();
+                            drop(q);
+                            if len > 0 {
+                                let sel = app
+                                    .table_state
+                                    .selected()
+                                    .map(|s| (s + 1) % len)
+                                    .unwrap_or(0);
+                                app.table_state.select(Some(sel));
                             }
-                            (KeyCode::Char('a'), _) | (KeyCode::Char('n'), _) => {
-                                app.input_mode = InputMode::AddingUrl;
+                        }
+                        (KeyCode::Up, _) | (KeyCode::Char('k'), _) => {
+                            let q = app.queue.read().await;
+                            let len = q.items.len();
+                            drop(q);
+                            if len > 0 {
+                                let sel = app
+                                    .table_state
+                                    .selected()
+                                    .map(|s| if s == 0 { len - 1 } else { s - 1 })
+                                    .unwrap_or(0);
+                                app.table_state.select(Some(sel));
+                            }
+                        }
+                        _ => {}
+                    },
+                    InputMode::AddingUrl => match key.code {
+                        KeyCode::Esc => {
+                            app.input_mode = InputMode::Normal;
+                            app.url_input.clear();
+                        }
+                        KeyCode::Enter => {
+                            let url = app.url_input.trim().to_string();
+                            if url.is_empty() {
+                                app.input_mode = InputMode::Normal;
                                 app.url_input.clear();
-                            }
-                            (KeyCode::Char('t'), _) => {
-                                app.audio_only = !app.audio_only;
-                            }
-                            (KeyCode::Down, _) | (KeyCode::Char('j'), _) => {
-                                let q = app.queue.read().await;
-                                let len = q.items.len();
-                                drop(q);
-                                if len > 0 {
-                                    let sel = app
-                                        .table_state
-                                        .selected()
-                                        .map(|s| (s + 1) % len)
-                                        .unwrap_or(0);
-                                    app.table_state.select(Some(sel));
-                                }
-                            }
-                            (KeyCode::Up, _) | (KeyCode::Char('k'), _) => {
-                                let q = app.queue.read().await;
-                                let len = q.items.len();
-                                drop(q);
-                                if len > 0 {
-                                    let sel = app
-                                        .table_state
-                                        .selected()
-                                        .map(|s| if s == 0 { len - 1 } else { s - 1 })
-                                        .unwrap_or(0);
-                                    app.table_state.select(Some(sel));
-                                }
-                            }
-                            _ => {}
-                        },
-                        InputMode::AddingUrl => match key.code {
-                            KeyCode::Esc => {
+                            } else {
+                                enqueue_and_start(app, url).await;
                                 app.input_mode = InputMode::Normal;
                                 app.url_input.clear();
                             }
-                            KeyCode::Enter => {
-                                let url = app.url_input.trim().to_string();
-                                if url.is_empty() {
-                                    app.input_mode = InputMode::Normal;
-                                    app.url_input.clear();
-                                } else {
-                                    enqueue_and_start(app, url).await;
-                                    app.input_mode = InputMode::Normal;
-                                    app.url_input.clear();
-                                }
-                            }
-                            KeyCode::Char(c) => app.url_input.push(c),
-                            KeyCode::Backspace => {
-                                app.url_input.pop();
-                            }
-                            _ => {}
-                        },
-                    }
-                }
+                        }
+                        KeyCode::Char(c) => app.url_input.push(c),
+                        KeyCode::Backspace => {
+                            app.url_input.pop();
+                        }
+                        _ => {}
+                    },
+                },
                 _ => {}
             }
         }
@@ -209,11 +211,7 @@ where
 }
 
 async fn enqueue_and_start(app: &mut App, url: String) {
-    let format: &str = if app.audio_only {
-        "bestaudio".into()
-    } else {
-        "best".into()
-    };
+    let format: &str = if app.audio_only { "bestaudio" } else { "best" };
     let item = DownloadItem::new(
         url.clone(),
         format.to_string(),
@@ -241,7 +239,7 @@ async fn enqueue_and_start(app: &mut App, url: String) {
         }
 
         // Fetch title
-        if let Ok((title, uploader)) = fetch_title_for_tui(&url).await {
+        if let Ok((title, uploader)) = fetch_title(&url).await {
             let mut q = queue.write().await;
             q.update_title(&item_id, title, Some(uploader));
         }
@@ -259,7 +257,7 @@ async fn enqueue_and_start(app: &mut App, url: String) {
             );
         }
 
-        let result = download_url_for_tui(&url, &format, audio_only, &output_dir).await;
+        let result = download_url(&url, audio_only, &output_dir).await;
 
         match result {
             Ok(path) => {
@@ -271,7 +269,7 @@ async fn enqueue_and_start(app: &mut App, url: String) {
                 q.update_status(
                     &item_id,
                     DownloadStatus::Failed {
-                        reason: format!("{:#}", e),
+                        reason: format!("{e:#}"),
                     },
                 );
             }
@@ -329,12 +327,12 @@ fn draw_header(f: &mut Frame, area: ratatui::layout::Rect, _app: &App) {
                 Style::default().fg(ACCENT).add_modifier(Modifier::BOLD),
             ),
             Span::styled(
-                "  —  download anything, anywhere",
+                "  —  blazing-fast YouTube downloader",
                 Style::default().fg(MUTED),
             ),
         ]),
         Line::from(vec![Span::styled(
-            "  YouTube · X/Twitter · Instagram · TikTok · Vimeo · +1800 more",
+            "  Paste a YouTube link and rip it to disk",
             Style::default().fg(MUTED),
         )]),
     ])
@@ -377,8 +375,8 @@ fn draw_queue(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
 
     f.render_widget(block, area);
 
-    // We need an async read but we're in sync rendering — use try_read
-    // The queue is small so contention is negligible
+    // We need an async read but we're in sync rendering — use try_read.
+    // The queue is small so contention is negligible.
     let items_snapshot: Vec<DownloadItem> = {
         if let Ok(q) = app.queue.try_read() {
             q.items.clone()
@@ -418,18 +416,10 @@ fn draw_queue(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
                 let title = item.title.as_deref().unwrap_or(&item.url);
                 let title_short = shorten(title, 38);
 
-                let platform = item.platform.as_deref().unwrap_or_else(|| {
-                    // detect at render time as fallback
-                    if item.url.contains("youtube") {
-                        "YouTube"
-                    } else if item.url.contains("x.com") || item.url.contains("twitter") {
-                        "X"
-                    } else if item.url.contains("instagram") {
-                        "IG"
-                    } else {
-                        "…"
-                    }
-                });
+                let platform = item
+                    .platform
+                    .as_deref()
+                    .unwrap_or_else(|| detect_platform(&item.url));
 
                 let status_label = item.status.label();
 
@@ -457,7 +447,7 @@ fn draw_queue(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             Constraint::Length(12),
         ];
 
-        let mut table_state_clone = app.table_state.clone();
+        let mut table_state_clone = app.table_state;
         let table = Table::new(rows, widths)
             .header(header)
             .row_highlight_style(
@@ -557,9 +547,15 @@ fn draw_detail(f: &mut Frame, area: ratatui::layout::Rect, item: &DownloadItem) 
 
     if let DownloadStatus::Failed { reason } = &item.status {
         lines.push(Line::from(""));
-        for chunk in reason.lines().flat_map(|l| l.chars().collect::<Vec<_>>().chunks(50).map(|c| c.iter().collect::<String>()).collect::<Vec<_>>()) {
+        for chunk in reason.lines().flat_map(|l| {
+            l.chars()
+                .collect::<Vec<_>>()
+                .chunks(50)
+                .map(|c| c.iter().collect::<String>())
+                .collect::<Vec<_>>()
+        }) {
             lines.push(Line::from(Span::styled(
-                format!("  ✗ {}", chunk),
+                format!("  ✗ {chunk}"),
                 Style::default().fg(RED),
             )));
         }
@@ -575,23 +571,21 @@ fn draw_detail(f: &mut Frame, area: ratatui::layout::Rect, item: &DownloadItem) 
     );
 
     // Progress gauge (below middle of detail)
-    if pct > 0.0 && pct < 100.0 {
-        if area.height > 10 {
-            let gauge_area = ratatui::layout::Rect {
-                x: area.x + 1,
-                y: area.y + area.height - 3,
-                width: area.width.saturating_sub(2),
-                height: 1,
-            };
-            let gauge = Gauge::default()
-                .gauge_style(Style::default().fg(CYAN).bg(PANEL_BG))
-                .ratio(pct / 100.0)
-                .label(Span::styled(
-                    format!("{:.0}%", pct),
-                    Style::default().fg(Color::White),
-                ));
-            f.render_widget(gauge, gauge_area);
-        }
+    if pct > 0.0 && pct < 100.0 && area.height > 10 {
+        let gauge_area = ratatui::layout::Rect {
+            x: area.x + 1,
+            y: area.y + area.height - 3,
+            width: area.width.saturating_sub(2),
+            height: 1,
+        };
+        let gauge = Gauge::default()
+            .gauge_style(Style::default().fg(CYAN).bg(PANEL_BG))
+            .ratio(pct / 100.0)
+            .label(Span::styled(
+                format!("{pct:.0}%"),
+                Style::default().fg(Color::White),
+            ));
+        f.render_widget(gauge, gauge_area);
     }
 }
 
@@ -632,7 +626,7 @@ fn draw_stats(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
             failed.to_string(),
             Style::default().fg(RED).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(format!("   →  {}", out), Style::default().fg(MUTED)),
+        Span::styled(format!("   →  {out}"), Style::default().fg(MUTED)),
     ]);
 
     let stats = Paragraph::new(line).block(
@@ -721,7 +715,7 @@ fn draw_input_modal(f: &mut Frame, area: ratatui::layout::Rect, app: &App) {
         .split(inner);
 
     let hint = Paragraph::new(Line::from(vec![Span::styled(
-        "Paste a URL from YouTube, X, Instagram, TikTok, Vimeo…",
+        "Paste a YouTube video or playlist URL…",
         Style::default().fg(MUTED),
     )]));
     f.render_widget(hint, rows[0]);

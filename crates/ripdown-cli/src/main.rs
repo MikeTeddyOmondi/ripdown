@@ -1,8 +1,6 @@
 mod cli;
-mod downloader;
-mod queue;
+mod download;
 mod tui;
-mod types;
 
 use anyhow::Result;
 use clap::Parser;
@@ -14,13 +12,13 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Download(args) => {
-            downloader::run_download(args).await?;
+            download::run_download(args).await?;
         }
         Commands::Tui => {
             tui::run().await?;
         }
         Commands::Info { url } => {
-            downloader::run_info(&url).await?;
+            download::run_info(&url).await?;
         }
     }
 

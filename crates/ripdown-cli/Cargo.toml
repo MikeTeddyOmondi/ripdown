@@ -1,0 +1,21 @@
+[package]
+name = "ripdown-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "A blazing-fast terminal video downloader for YouTube (CLI + TUI)"
+
+[[bin]]
+name = "ripdown"
+path = "src/main.rs"
+
+[dependencies]
+ripdown-core = { workspace = true, features = ["clap"] }
+clap = { version = "4", features = ["derive", "color", "env"] }
+tokio.workspace = true
+anyhow.workspace = true
+dirs.workspace = true
+ratatui = "0.30.0"
+crossterm = "0.29"
+indicatif = { version = "0.18.4", features = ["tokio"] }
