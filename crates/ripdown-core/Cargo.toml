@@ -1,0 +1,31 @@
+[package]
+name = "ripdown-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core download engine, models and storage backends for ripdown"
+
+[dependencies]
+tokio.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+dirs.workspace = true
+tracing.workspace = true
+yt-dlp.workspace = true
+async-trait = "0.1"
+
+# Optional integrations
+clap = { version = "4", features = ["derive"], optional = true }
+rust-s3 = { version = "0.35", default-features = false, features = ["tokio-rustls-tls"], optional = true }
+
+[features]
+default = []
+# Enables clap `ValueEnum` derive on domain enums (used by the CLI crate).
+clap = ["dep:clap"]
+# Enables the S3/rustfs storage backend.
+s3 = ["dep:rust-s3"]
