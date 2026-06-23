@@ -28,12 +28,23 @@ pub struct VideoMeta {
 /// ffmpeg binaries on first use (a no-op once cached).
 pub async fn build_downloader(output_dir: &Path) -> Result<Downloader> {
     let libs = libs_dir();
-    let libraries = Libraries::new(libs.join("yt-dlp"), libs.join("ffmpeg"));
+    let yt_dlp = libs.join("yt-dlp");
+    let ffmpeg = libs.join("ffmpeg");
+    let libraries = Libraries::new(yt_dlp.clone(), ffmpeg.clone());
 
-    let libraries = libraries
-        .install_dependencies()
-        .await
-        .context("Failed to install yt-dlp / ffmpeg binaries (check network access)")?;
+    // Only auto-install when the binaries are missing. `install_dependencies`
+    // queries `api.github.com` for the latest yt-dlp release, which is
+    // rate-limited (HTTP 403) from shared datacenter IPs (cloud hosts like
+    // Render). When the binaries are pre-baked into the image this is skipped
+    // entirely, so deployments never depend on the GitHub API at runtime.
+    let libraries = if yt_dlp.exists() && ffmpeg.exists() {
+        libraries
+    } else {
+        libraries
+            .install_dependencies()
+            .await
+            .context("Failed to install yt-dlp / ffmpeg binaries (check network access)")?
+    };
 
     std::fs::create_dir_all(output_dir).context("Failed to create output directory")?;
 

@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - unreleased
+
+### Changed
+- Docker images now pre-bake yt-dlp + ffmpeg at build time (arch-aware: amd64 /
+  arm64) so deployments never call the GitHub API at runtime.
+
+### Fixed
+- Downloads failing on cloud hosts (e.g. Render) with `403 Forbidden` from
+  `api.github.com`: the engine now skips the yt-dlp/ffmpeg auto-install when the
+  binaries already exist, instead of querying the rate-limited GitHub API on
+  every (cold) start from a shared datacenter IP.
+
 ## [0.2.0] - 2026-06-23
 
 Restructured the single-binary app into a Cargo workspace and added an HTTP
