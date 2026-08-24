@@ -38,6 +38,13 @@ pub enum Commands {
     #[command(alias = "ui")]
     Tui,
 
+    /// Inspect or reinstall the bundled yt-dlp + ffmpeg binaries
+    Libs {
+        /// Wipe the cached binaries and install them afresh
+        #[arg(long)]
+        reinstall: bool,
+    },
+
     /// Fetch and display metadata for a URL without downloading
     Info {
         /// The video URL to inspect
