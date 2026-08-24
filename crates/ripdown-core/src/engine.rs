@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use yt_dlp::{client::deps::Libraries, Downloader};
 
-use crate::config::libs_dir;
+use crate::config::{clear_libs, libs_dir, libs_state, write_libs_manifest, LibsState};
 use crate::models::DownloadStatus;
 
 /// Lightweight, serializable view of a video's metadata.
@@ -24,27 +24,52 @@ pub struct VideoMeta {
     pub description: Option<String>,
 }
 
-/// Build a configured yt-dlp [`Downloader`], auto-downloading the yt-dlp +
-/// ffmpeg binaries on first use (a no-op once cached).
-pub async fn build_downloader(output_dir: &Path) -> Result<Downloader> {
-    let libs = libs_dir();
-    let yt_dlp = libs.join("yt-dlp");
-    let ffmpeg = libs.join("ffmpeg");
-    let libraries = Libraries::new(yt_dlp.clone(), ffmpeg.clone());
+/// Ensure the yt-dlp + ffmpeg binaries are installed and owned by this ripdown
+/// build, returning the resolved [`Libraries`].
+///
+/// Binaries left behind by an older ripdown (or older than the max-age window)
+/// are wiped and reinstalled from scratch — a partial upgrade of a cached libs
+/// dir is exactly how yt-dlp/ffmpeg mismatches happen. Pass `force` to
+/// reinstall unconditionally (`ripdown libs --reinstall`).
+///
+/// A healthy, current install is a no-op: `install_dependencies` queries
+/// `api.github.com`, which is rate-limited (HTTP 403) from shared datacenter
+/// IPs like Render's, so deployments with pre-baked binaries (which also set
+/// `RIPDOWN_SKIP_LIB_UPDATE`) never touch the GitHub API at runtime.
+pub async fn ensure_libraries(force: bool) -> Result<Libraries> {
+    let state = libs_state();
 
-    // Only auto-install when the binaries are missing. `install_dependencies`
-    // queries `api.github.com` for the latest yt-dlp release, which is
-    // rate-limited (HTTP 403) from shared datacenter IPs (cloud hosts like
-    // Render). When the binaries are pre-baked into the image this is skipped
-    // entirely, so deployments never depend on the GitHub API at runtime.
-    let libraries = if yt_dlp.exists() && ffmpeg.exists() {
-        libraries
-    } else {
-        libraries
-            .install_dependencies()
-            .await
-            .context("Failed to install yt-dlp / ffmpeg binaries (check network access)")?
-    };
+    if force || matches!(state, LibsState::Stale(_)) {
+        if let LibsState::Stale(reason) = &state {
+            tracing::info!("reinstalling yt-dlp + ffmpeg binaries: {reason}");
+        }
+        clear_libs().context("Failed to remove the stale yt-dlp / ffmpeg binaries")?;
+    }
+
+    let libs = libs_dir();
+    let libraries = Libraries::new(libs.join("yt-dlp"), libs.join("ffmpeg"));
+
+    if !force && state == LibsState::Current {
+        return Ok(libraries);
+    }
+
+    let libraries = libraries
+        .install_dependencies()
+        .await
+        .context("Failed to install yt-dlp / ffmpeg binaries (check network access)")?;
+
+    // Stamp the install so a later ripdown can tell it owns these binaries.
+    if let Err(e) = write_libs_manifest() {
+        tracing::warn!("failed to write the libs version stamp: {e}");
+    }
+
+    Ok(libraries)
+}
+
+/// Build a configured yt-dlp [`Downloader`], installing or refreshing the
+/// yt-dlp + ffmpeg binaries as needed (a no-op once cached and current).
+pub async fn build_downloader(output_dir: &Path) -> Result<Downloader> {
+    let libraries = ensure_libraries(false).await?;
 
     std::fs::create_dir_all(output_dir).context("Failed to create output directory")?;
 

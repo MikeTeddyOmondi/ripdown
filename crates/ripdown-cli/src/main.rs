@@ -17,6 +17,9 @@ async fn main() -> Result<()> {
         Commands::Tui => {
             tui::run().await?;
         }
+        Commands::Libs { reinstall } => {
+            download::run_libs(reinstall).await?;
+        }
         Commands::Info { url } => {
             download::run_info(&url).await?;
         }

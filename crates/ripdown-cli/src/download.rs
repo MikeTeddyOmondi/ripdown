@@ -5,8 +5,12 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use ripdown_core::config::{binaries_present, libs_dir, resolve_output_dir};
-use ripdown_core::engine::{build_downloader, download_single, fetch_info_standalone};
+use ripdown_core::config::{
+    binaries_present, libs_dir, libs_state, read_libs_manifest, resolve_output_dir, LibsState,
+};
+use ripdown_core::engine::{
+    build_downloader, download_single, ensure_libraries, fetch_info_standalone,
+};
 
 use crate::cli::DownloadArgs;
 
@@ -23,6 +27,12 @@ pub async fn run_download(args: DownloadArgs) -> Result<()> {
         args.jobs
     );
     println!();
+
+    // Binaries left by an older ripdown are refreshed before the first download.
+    if let LibsState::Stale(reason) = libs_state() {
+        println!("  \x1b[33m[libs]\x1b[0m Refreshing yt-dlp + ffmpeg — {reason}");
+        println!();
+    }
 
     // First run will auto-download yt-dlp + ffmpeg binaries — warn the user.
     if !binaries_present() {
@@ -154,4 +164,41 @@ fn format_number(n: u64) -> String {
         out.push(c);
     }
     out.chars().rev().collect()
+}
+
+/// `ripdown libs` — report on the cached binaries, optionally reinstalling them.
+pub async fn run_libs(reinstall: bool) -> Result<()> {
+    println!();
+    println!(
+        "  ⚡ \x1b[1;36mripdown libs\x1b[0m  →  {}",
+        libs_dir().display()
+    );
+
+    match read_libs_manifest() {
+        Some(m) => println!(
+            "  installed by ripdown {} on {}",
+            m.ripdown_version,
+            m.installed_at.format("%Y-%m-%d %H:%M UTC")
+        ),
+        None if binaries_present() => {
+            println!("  installed by an older ripdown (no version stamp)")
+        }
+        None => println!("  not installed yet"),
+    }
+
+    match libs_state() {
+        LibsState::Current if !reinstall => {
+            println!("  \x1b[32mup to date\x1b[0m — nothing to do");
+            println!();
+            return Ok(());
+        }
+        LibsState::Missing => println!("  \x1b[33mmissing\x1b[0m — installing…"),
+        LibsState::Stale(reason) => println!("  \x1b[33mstale\x1b[0m — {reason}; reinstalling…"),
+        LibsState::Current => println!("  reinstalling on request…"),
+    }
+
+    ensure_libraries(reinstall).await?;
+    println!("  \x1b[32mdone\x1b[0m — yt-dlp + ffmpeg installed fresh");
+    println!();
+    Ok(())
 }
