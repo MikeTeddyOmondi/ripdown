@@ -22,7 +22,9 @@ ARG TARGETARCH
 
 # Pin the data dir so `data_local_dir()` is deterministic regardless of $HOME.
 ENV XDG_DATA_HOME=/root/.local/share
-ENV RIPDOWN_LIBS=/root/.local/share/ripdown/libs
+ENV RIPDOWN_LIBS=/root/.local/share/ripdown/libs \
+    # Binaries are baked in below; never re-fetch them at runtime.
+    RIPDOWN_SKIP_LIB_UPDATE=1
 
 # Pre-bake yt-dlp + ffmpeg into the image. This avoids the runtime call to
 # api.github.com that the yt-dlp crate makes to resolve the latest release —

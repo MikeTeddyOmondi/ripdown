@@ -19,7 +19,9 @@ ARG TARGETARCH
 
 # Pin the data dir so `data_local_dir()` is deterministic regardless of $HOME.
 ENV XDG_DATA_HOME=/root/.local/share
-ENV RIPDOWN_LIBS=/root/.local/share/ripdown/libs
+ENV RIPDOWN_LIBS=/root/.local/share/ripdown/libs \
+    # Binaries are baked in below; never re-fetch them at runtime.
+    RIPDOWN_SKIP_LIB_UPDATE=1
 
 # Pre-bake yt-dlp + ffmpeg so the CLI never has to call api.github.com at
 # runtime (rate-limited from shared datacenter IPs). See http.Dockerfile.
