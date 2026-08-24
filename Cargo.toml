@@ -3,7 +3,7 @@ members = ["crates/ripdown-core", "crates/ripdown-cli", "crates/ripdown-http"]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Rancko"]
 license = "MIT"

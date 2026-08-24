@@ -5,6 +5,24 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-24
+
+### Added
+- `ripdown libs` command: reports which ripdown version installed the cached
+  yt-dlp + ffmpeg binaries, with `--reinstall` to wipe and install them afresh.
+- Version stamp (`.ripdown-libs.json`) written alongside the binaries recording
+  the installing ripdown version and timestamp.
+- `RIPDOWN_LIBS_MAX_AGE_DAYS` (default 30, `0` disables) to refresh binaries that
+  have aged out, and `RIPDOWN_SKIP_LIB_UPDATE` to pin pre-baked installs.
+
+### Changed
+- The engine now detects binaries left behind by an older ripdown — no stamp, a
+  different version, or past the max-age window — and wipes the libs directory
+  for a clean reinstall instead of reusing them indefinitely.
+- Docker images set `RIPDOWN_SKIP_LIB_UPDATE=1` so pre-baked binaries are never
+  re-fetched at runtime.
+- Bumped the `yt-dlp` crate from 2.7.1 to 2.8.3.
+
 ## [0.3.0] - 2026-06-23
 
 ### Changed
