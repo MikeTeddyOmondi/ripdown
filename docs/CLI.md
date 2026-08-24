@@ -134,17 +134,35 @@ description.
 
 ---
 
+## `ripdown libs`
+
+Inspect the cached yt-dlp + ffmpeg binaries, or reinstall them from scratch.
+
+```bash
+ripdown libs              # show which ripdown version installed them
+ripdown libs --reinstall  # wipe <data_local>/ripdown/libs and install afresh
+```
+
+The binaries are stamped with the installing ripdown version in
+`<data_local>/ripdown/libs/.ripdown-libs.json`. When that stamp is missing
+(binaries left by an older ripdown), names a different version, or is older
+than the max-age window, the next `download` / `tui` / `info` run wipes the
+libs directory and reinstalls automatically.
+
 ## Environment variables
 
-| Variable             | Used by           | Description              |
-| -------------------- | ----------------- | ------------------------ |
-| `RIPDOWN_OUTPUT_DIR` | `download`, `tui` | Default output directory |
+| Variable                     | Used by           | Description                                                        |
+| ---------------------------- | ----------------- | ------------------------------------------------------------------ |
+| `RIPDOWN_OUTPUT_DIR`         | `download`, `tui` | Default output directory                                           |
+| `RIPDOWN_LIBS_MAX_AGE_DAYS`  | all               | Days before cached binaries are refreshed (default 30; `0` = never) |
+| `RIPDOWN_SKIP_LIB_UPDATE`    | all               | Set to `1` to never re-fetch binaries (used by the Docker images)  |
 
 ## First run
 
 On first download the `yt-dlp` crate fetches the yt-dlp + ffmpeg binaries
 (~50 MB) into `<data_local>/ripdown/libs` and caches them. This needs network
-access and only happens once.
+access and only happens once, until the install goes stale (see
+[`ripdown libs`](#ripdown-libs)).
 
 ---
 
