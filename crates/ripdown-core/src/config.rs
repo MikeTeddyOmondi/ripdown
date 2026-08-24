@@ -69,8 +69,7 @@ pub fn write_libs_manifest() -> std::io::Result<()> {
         installed_at: chrono::Utc::now(),
     };
     std::fs::create_dir_all(libs_dir())?;
-    let json = serde_json::to_string_pretty(&manifest)
-        .map_err(std::io::Error::other)?;
+    let json = serde_json::to_string_pretty(&manifest).map_err(std::io::Error::other)?;
     std::fs::write(libs_manifest_path(), json)
 }
 

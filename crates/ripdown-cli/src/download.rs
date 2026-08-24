@@ -169,7 +169,10 @@ fn format_number(n: u64) -> String {
 /// `ripdown libs` — report on the cached binaries, optionally reinstalling them.
 pub async fn run_libs(reinstall: bool) -> Result<()> {
     println!();
-    println!("  ⚡ \x1b[1;36mripdown libs\x1b[0m  →  {}", libs_dir().display());
+    println!(
+        "  ⚡ \x1b[1;36mripdown libs\x1b[0m  →  {}",
+        libs_dir().display()
+    );
 
     match read_libs_manifest() {
         Some(m) => println!(
